@@ -228,6 +228,7 @@ main(){
         os_install_certbot_apache
         docker-start-service
         ssl_cerbot_create_certs
+        ssl_create_dom_certs   #---- REQUIRED OR REGISTRY WILL NOT START! ----
         docker_http_auth
         apache_stop
         docker-stop-service
@@ -239,3 +240,16 @@ main(){
 #  . `pwd`/docker_private_registry_base_build.sh rke2private vm-rg-rke2private-1-1 20.69.126.36 10.0.0.4
 
 #/*********************************************************************************************************/
+
+
+function docker_login_repo(){
+    sudo docker login -u${RKE2_REGISTRY_AUTH_USER} -p${RKE2_REGISTRY_AUTH_PASS} ${RKE2_REGISTRY_AUTH_URL}:443
+}
+
+function docker_test_repo(){
+            DOCKER_HOST="${RKE2_REGISTRY_AUTH_URL}:443"
+            echo docker pull rancher/rancher:2.5.11
+            echo docker tag alpine ${DOCKER_HOST}/my-alpine
+            echo docker push ${DOCKER_HOST}/my-alpine
+}
+
