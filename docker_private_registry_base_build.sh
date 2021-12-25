@@ -1,21 +1,5 @@
 #!/bin/bash
 
-#\******************************************************************/#
-# | general functions
-#/------------------------------------------------------------------\#
-function __MSG_HEADLINE__(){
-    echo "[INFO]  ===== ${1} ====="
-}
-function __MSG_LINE__(){
-    echo "-------------------------------------------------"
-}
-function __MSG_BANNER__(){
-    __MSG_LINE__
-    __MSG_HEADLINE__ "${1}"
-    __MSG_LINE__
-
-}
-
 
 #/*********************************************************************************************************/
 #/ docker Private Registry Setup
@@ -62,11 +46,6 @@ function azenv(){
 
 
 function dtrenv(){
-  MY_VM_HOST=${AZ_VM_NAME_ROOT}-106
-  RKE2_REGISTRY_AUTH_URL=${MY_VM_HOST}.westus2.cloudapp.azure.com
-  MY_REGISTRY_IP=20.115.150.110
-  IFILE=/Users/admin/.ssh/vm-rg-dtrprivateprod-1-1
-  MY_PRIVATE_IP=10.0.0.4
   DOCKER_DAEMON_JSON=/etc/docker/daemon.json
   DOCKER_SERVICE_CONFIG=/lib/systemd/system/docker.service
 }
@@ -86,7 +65,7 @@ function docker_install(){
             ca-certificates \
             curl \
             gnupg \
-            lsb-release
+            lsb-release -y
 
         curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
         echo \
@@ -94,7 +73,7 @@ function docker_install(){
           $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
         sudo apt-get update
-        sudo apt-get install docker-ce docker-ce-cli containerd.io
+        sudo apt-get install docker-ce docker-ce-cli containerd.io -y
 }
 
 
@@ -102,12 +81,12 @@ function dockerInsecConfigure(){
     #---> https://stackoverflow.com/questions/42211380/add-insecure-registry-to-docker
 cat <<EOF|sudo tee ${DOCKER_DAEMON_JSON}
 {
-  "insecure-registries" : ["${RKE2_REGISTRY_AUTH_URL}","${MY_VM_HOST}","${MY_REGISTRY_IP}","${MY_PRIVATE_IP}"]
+  "insecure-registries" : ["${RKE2_REGISTRY_AUTH_URL}","${RKE2_REGISTRY_HOST_NAME}","${RKE2_REGISTRY_HOST_IP}","${RKE2_REGISTRY_HOST_IP_PRIVATE}"]
 }
 EOF
 
 cat <<EOF| sudo tee -a /etc/default/docker
-DOCKER_OPTS="--insecure-registry=${RKE2_REGISTRY_AUTH_URL} --insecure-registry=${MY_PRIVATE_IP} --insecure-registry=${MY_VM_HOST}"
+DOCKER_OPTS="--insecure-registry=${RKE2_REGISTRY_AUTH_URL} --insecure-registry=${RKE2_REGISTRY_HOST_IP_PRIVATE} --insecure-registry=${RKE2_REGISTRY_HOST_NAME}"
 EOF
 
 ls -al ${DOCKER_DAEMON_JSON} /etc/default/docker
@@ -144,6 +123,18 @@ function os_install_certbot(){
     sudo apt install certbot -y
     certbot --version
     certbot plugins
+
+        # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        # * standalone
+        # Description: Spin up a temporary webserver
+        # Interfaces: IAuthenticator, IPlugin
+        # Entry point: standalone = certbot.plugins.standalone:Authenticator
+
+        # * webroot
+        # Description: Place files in webroot directory
+        # Interfaces: IAuthenticator, IPlugin
+        # Entry point: webroot = certbot.plugins.webroot:Authenticator
+        # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -    
 }
 
 function os_install_certbot_apache(){
@@ -177,7 +168,7 @@ function docker_http_auth(){
             sudo docker run -it --entrypoint htpasswd \
                     -v $PWD/auth:/auth \
                     -w /auth registry:2.7.0 \
-                    -Bbc /auth/htpasswd dtradmin lLmxF6LmrGFcj6G
+                    -Bbc /auth/htpasswd ${RKE2_REGISTRY_AUTH_USER} ${RKE2_REGISTRY_AUTH_PASS}
 }
 
 function apache_stop(){
@@ -213,7 +204,16 @@ function docker_rsync_repo_locn(){
 #/ MAIN
 #/*********************************************************************************************************/
 
-AZ_CLUSTER_GROUP_NAME="${1}"      #---- dtrprivateprod
+AZ_CLUSTER_GROUP_NAME="${1}"        #---- rke2private
+RKE2_REGISTRY_HOST_NAME=${2}        #---- vm-rg-rke2private-1-1
+RKE2_REGISTRY_AUTH_URL=${RKE2_REGISTRY_HOST_NAME}.westus2.cloudapp.azure.com
+RKE2_REGISTRY_HOST_IP=${3}          #---- 20.69.126.36
+RKE2_REGISTRY_HOST_IP_PRIVATE=${4}  #---- 10.0.0.4
+RKE2_REGISTRY_AUTH_USER=${5}        #---- qgenqzva
+RKE2_REGISTRY_AUTH_PASS=${6}        #---- yYzkS6YzeTSpw6T
+
+
+IFILE=/Users/admin/.ssh/${RKE2_REGISTRY_HOST_NAME}
 
 main(){
 		azenv load
@@ -221,19 +221,21 @@ main(){
 
 		helm-install
 		docker_install
-		dockerInsecConfigure
-		docker-stop-service
-		os_install_common_props
-		os_install_certbot
-		os_install_certbot_apache
-
-		ssl_cerbot_create_certs
-		docker_http_auth
-		apache_stop
-		docker-stop-service
-		docker_repo_start
+        dockerInsecConfigure
+        docker-stop-service
+        os_install_common_props
+        os_install_certbot
+        os_install_certbot_apache
+        docker-start-service
+        ssl_cerbot_create_certs
+        docker_http_auth
+        apache_stop
+        docker-stop-service
+        docker-start-service
+        docker_repo_start
 		#docker_rsync_repo_locn app-sdc
 }
 
+#  . `pwd`/docker_private_registry_base_build.sh rke2private vm-rg-rke2private-1-1 20.69.126.36 10.0.0.4
 
 #/*********************************************************************************************************/
