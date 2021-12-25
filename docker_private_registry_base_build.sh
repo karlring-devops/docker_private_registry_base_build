@@ -47,7 +47,7 @@ function azenv(){
 
 function dtrenv(){
   MY_VM_HOST=${AZ_VM_NAME_ROOT}-106
-  MY_REGISTRY_DOMIN_COM=${MY_VM_HOST}.westus2.cloudapp.azure.com
+  RKE2_REGISTRY_AUTH_URL=${MY_VM_HOST}.westus2.cloudapp.azure.com
   MY_REGISTRY_IP=20.115.150.110
   IFILE=/Users/admin/.ssh/vm-rg-dtrprivateprod-1-1
   MY_PRIVATE_IP=10.0.0.4
@@ -86,12 +86,12 @@ function dockerInsecConfigure(){
     #---> https://stackoverflow.com/questions/42211380/add-insecure-registry-to-docker
 cat <<EOF|sudo tee ${DOCKER_DAEMON_JSON}
 {
-  "insecure-registries" : ["${MY_REGISTRY_DOMIN_COM}","${MY_VM_HOST}","${MY_REGISTRY_IP}","${MY_PRIVATE_IP}"]
+  "insecure-registries" : ["${RKE2_REGISTRY_AUTH_URL}","${MY_VM_HOST}","${MY_REGISTRY_IP}","${MY_PRIVATE_IP}"]
 }
 EOF
 
 cat <<EOF| sudo tee -a /etc/default/docker
-DOCKER_OPTS="--insecure-registry=${MY_REGISTRY_DOMIN_COM} --insecure-registry=${MY_PRIVATE_IP} --insecure-registry=${MY_VM_HOST}"
+DOCKER_OPTS="--insecure-registry=${RKE2_REGISTRY_AUTH_URL} --insecure-registry=${MY_PRIVATE_IP} --insecure-registry=${MY_VM_HOST}"
 EOF
 
 ls -al ${DOCKER_DAEMON_JSON} /etc/default/docker
@@ -135,12 +135,12 @@ function os_install_certbot_apache(){
 }
 
 function ssl_cerbot_create_certs(){
-    sudo certbot --apache -d ${MY_REGISTRY_DOMIN_COM}
+    sudo certbot --apache -d ${RKE2_REGISTRY_AUTH_URL}
 }
 
 
 function ssl_create_dom_certs(){
-            ETC_DOMAIN=/etc/letsencrypt/live/${MY_REGISTRY_DOMIN_COM}
+            ETC_DOMAIN=/etc/letsencrypt/live/${RKE2_REGISTRY_AUTH_URL}
                     # privkey.pem
                     # cert.pem
                     # chain.pem
@@ -169,8 +169,8 @@ function apache_stop(){
 }
 
 function docker_repo_start(){
-            sudo docker run -d -p 443:443 --restart=always --name registry \
-              -v /etc/letsencrypt/live/${MY_REGISTRY_DOMIN_COM}:/certs \
+        sudo docker run -d -p 443:443 --restart=always --name registry \
+              -v /etc/letsencrypt/live/${RKE2_REGISTRY_AUTH_URL}:/certs \
               -v /app-sdc/docker/var/lib/registry:/var/lib/registry \
               -v `pwd`/auth:/auth \
               -e "REGISTRY_AUTH=htpasswd" \
