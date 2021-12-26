@@ -22,6 +22,7 @@ alias ns='sudo netstat -tulnp'
 
 function azenv(){
     __MSG_BANNER__ "${1}"
+    export RKE2_DTR_STR=`date '+%Y%m%d%H%s'`
     AZ_RESOURCE_GROUP_NAME="rg-${AZ_CLUSTER_GROUP_NAME}-1"
     AZ_RESOURCE_LOCATION="westus2"
     AZ_PUBLIC_IP="ip-pub-${AZ_RESOURCE_GROUP_NAME}-lb"
@@ -48,6 +49,7 @@ function azenv(){
 function dtrenv(){
   DOCKER_DAEMON_JSON=/etc/docker/daemon.json
   DOCKER_SERVICE_CONFIG=/lib/systemd/system/docker.service
+  DOCKER_ETC_DEFAULT=/etc/default/docker 
 }
 
 
@@ -80,21 +82,25 @@ function docker_install(){
 function dockerInsecConfigure(){
     #---> https://stackoverflow.com/questions/42211380/add-insecure-registry-to-docker
 
+[ -f ${DOCKER_DAEMON_JSON} ] && sudo cp {DOCKER_DAEMON_JSON} {DOCKER_DAEMON_JSON}.${RKE2_DTR_STR}
+head -n -3 {DOCKER_DAEMON_JSON}.${RKE2_DTR_STR} > ${DOCKER_DAEMON_JSON}
+
 cat <<EOF|sudo tee ${DOCKER_DAEMON_JSON}
 {
   "insecure-registries" : ["${RKE2_REGISTRY_AUTH_URL}","${RKE2_REGISTRY_HOST_NAME}","${RKE2_REGISTRY_HOST_IP}","${RKE2_REGISTRY_HOST_IP_PRIVATE}"]
 }
 EOF
 
-sudo grep -v DOCKER_OPTS /etc/default/docker | sudo tee /tmp/etc_default_docker
+[ -f ${DOCKER_ETC_DEFAULT} ] && sudo cp ${DOCKER_ETC_DEFAULT} ${DOCKER_ETC_DEFAULT}.${RKE2_DTR_STR}
+sudo grep -v DOCKER_OPTS ${DOCKER_ETC_DEFAULT} | sudo tee /tmp/etc_default_docker
 
 cat <<EOF| sudo tee -a /tmp/etc_default_docker
-DOCKER_OPTS="--insecure-registry=${RKE2_REGISTRY_AUTH_URL} --insecure-registry=${RKE2_REGISTRY_HOST_IP_PRIVATE} --insecure-registry=${RKE2_REGISTRY_HOST_NAME}"
+DOCKER_OPTS="--insecure-registry=${RKE2_REGISTRY_AUTH_URL} --insecure-registry=${RKE2_REGISTRY_HOST_IP} --insecure-registry=${RKE2_REGISTRY_HOST_NAME}"
 EOF
 
-sudo mv /tmp/etc_default_docker /etc/default/docker
+sudo mv /tmp/etc_default_docker ${DOCKER_ETC_DEFAULT}
 
-ls -al ${DOCKER_DAEMON_JSON} /etc/default/docker
+ls -al ${DOCKER_DAEMON_JSON} ${DOCKER_ETC_DEFAULT}
 }
 
 function docker-stop-service(){
@@ -211,7 +217,12 @@ function docker_rsync_repo_locn(){
 }
 
 #/*********************************************************************************************************/
-#/ MAIN
+#                  _       
+#  _ __ ___   __ _(_)_ __  
+# | '_ ` _ \ / _` | | '_ \ 
+# | | | | | | (_| | | | | |
+# |_| |_| |_|\__,_|_|_| |_|
+#                          
 #/*********************************************************************************************************/
 
 AZ_CLUSTER_GROUP_NAME="${1}"        #---- rke2private
@@ -229,21 +240,21 @@ main(){
 		azenv load
 		dtrenv
 
-		helm-install
-		docker_install
-        dockerInsecConfigure
-        docker-stop-service
-        os_install_common_props
-        os_install_certbot
-        os_install_certbot_apache
-        ssl_cerbot_create_certs
-        ssl_create_dom_certs   #---- REQUIRED OR REGISTRY WILL NOT START! ----
-        docker-start-service
-        docker_http_auth
-        apache_stop
-        docker-stop-service
-        docker-start-service
-        docker_repo_start
+helm-install
+docker_install
+dockerInsecConfigure
+docker-stop-service
+os_install_common_props
+os_install_certbot
+os_install_certbot_apache
+ssl_cerbot_create_certs
+ssl_create_dom_certs   #---- REQUIRED OR REGISTRY WILL NOT START! ----
+docker-start-service
+docker_http_auth
+apache_stop
+docker-stop-service
+docker-start-service
+docker_repo_start
 		#docker_rsync_repo_locn app-sdc
 }
 
@@ -255,7 +266,7 @@ function sshdprepo(){ ssh -i ~/.ssh/vm-rg-${AZ_CLUSTER_GROUP_NAME}-1-1  azureuse
 
 
 function docker_login_repo(){
-    sudo docker login -u${RKE2_REGISTRY_AUTH_USER} -p${RKE2_REGISTRY_AUTH_PASS} ${RKE2_REGISTRY_AUTH_URL}:443
+    echo sudo docker login -u${RKE2_REGISTRY_AUTH_USER} -p${RKE2_REGISTRY_AUTH_PASS} ${RKE2_REGISTRY_AUTH_URL}:443
 }
 
 function docker_test_repo(){
@@ -264,3 +275,24 @@ function docker_test_repo(){
             sudo docker tag alpine ${DOCKER_HOST}/my-alpine
             sudo docker push ${DOCKER_HOST}/my-alpine
 }
+
+
+
+# dps
+# dtrenv
+# azenv load
+# sudo docker stop container registry
+# docker-stop-service
+# docker-start-service
+# docker_http_auth 
+# sudo docker start container registry
+# dps
+# ns
+
+
+
+
+
+
+
+
