@@ -79,15 +79,20 @@ function docker_install(){
 
 function dockerInsecConfigure(){
     #---> https://stackoverflow.com/questions/42211380/add-insecure-registry-to-docker
+
 cat <<EOF|sudo tee ${DOCKER_DAEMON_JSON}
 {
   "insecure-registries" : ["${RKE2_REGISTRY_AUTH_URL}","${RKE2_REGISTRY_HOST_NAME}","${RKE2_REGISTRY_HOST_IP}","${RKE2_REGISTRY_HOST_IP_PRIVATE}"]
 }
 EOF
 
-cat <<EOF| sudo tee -a /etc/default/docker
+sudo grep -v DOCKER_OPTS /etc/default/docker | sudo tee /tmp/etc_default_docker
+
+cat <<EOF| sudo tee -a /tmp/etc_default_docker
 DOCKER_OPTS="--insecure-registry=${RKE2_REGISTRY_AUTH_URL} --insecure-registry=${RKE2_REGISTRY_HOST_IP_PRIVATE} --insecure-registry=${RKE2_REGISTRY_HOST_NAME}"
 EOF
+
+sudo mv /tmp/etc_default_docker /etc/default/docker
 
 ls -al ${DOCKER_DAEMON_JSON} /etc/default/docker
 }
@@ -173,6 +178,11 @@ function docker_http_auth(){
 
 function apache_stop(){
             sudo systemctl stop apache2.service
+            sudo systemctl status apache2.service --no-pager
+            for z in `ps -ef | grep apache2|awk '{print $2}'`
+             do
+                sudo kill -9 ${z}
+            done
 }
 
 function docker_repo_start(){
@@ -226,9 +236,9 @@ main(){
         os_install_common_props
         os_install_certbot
         os_install_certbot_apache
-        docker-start-service
         ssl_cerbot_create_certs
         ssl_create_dom_certs   #---- REQUIRED OR REGISTRY WILL NOT START! ----
+        docker-start-service
         docker_http_auth
         apache_stop
         docker-stop-service
@@ -241,6 +251,8 @@ main(){
 
 #/*********************************************************************************************************/
 
+function sshdprepo(){ ssh -i ~/.ssh/vm-rg-${AZ_CLUSTER_GROUP_NAME}-1-1  azureuser@vm-rg-${AZ_CLUSTER_GROUP_NAME}-1-1 ; }
+
 
 function docker_login_repo(){
     sudo docker login -u${RKE2_REGISTRY_AUTH_USER} -p${RKE2_REGISTRY_AUTH_PASS} ${RKE2_REGISTRY_AUTH_URL}:443
@@ -248,8 +260,7 @@ function docker_login_repo(){
 
 function docker_test_repo(){
             DOCKER_HOST="${RKE2_REGISTRY_AUTH_URL}:443"
-            echo docker pull rancher/rancher:2.5.11
-            echo docker tag alpine ${DOCKER_HOST}/my-alpine
-            echo docker push ${DOCKER_HOST}/my-alpine
+            sudo docker pull alpine
+            sudo docker tag alpine ${DOCKER_HOST}/my-alpine
+            sudo docker push ${DOCKER_HOST}/my-alpine
 }
-
