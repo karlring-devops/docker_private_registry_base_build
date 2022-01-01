@@ -225,13 +225,13 @@ function docker_rsync_repo_locn(){
 #                          
 #/*********************************************************************************************************/
 
-AZ_CLUSTER_GROUP_NAME="${1}"        #---- rke2private
-RKE2_REGISTRY_HOST_NAME=${2}        #---- vm-rg-rke2private-1-1
-RKE2_REGISTRY_AUTH_URL=${RKE2_REGISTRY_HOST_NAME}.westus2.cloudapp.azure.com
-RKE2_REGISTRY_HOST_IP=${3}          #---- 20.69.126.36
-RKE2_REGISTRY_HOST_IP_PRIVATE=${4}  #---- 10.0.0.4
-RKE2_REGISTRY_AUTH_USER=${5}        #---- qgenqzva
-RKE2_REGISTRY_AUTH_PASS=${6}        #---- yYzkS6YzeTSpw6T
+export AZ_CLUSTER_GROUP_NAME="${1}"        #---- rke2private
+export RKE2_REGISTRY_HOST_NAME=${2}        #---- vm-rg-rke2private-1-1
+export RKE2_REGISTRY_AUTH_URL=${RKE2_REGISTRY_HOST_NAME}.westus2.cloudapp.azure.com
+export RKE2_REGISTRY_HOST_IP=${3}          #---- 20.69.126.36
+export RKE2_REGISTRY_HOST_IP_PRIVATE=${4}  #---- 10.0.0.4
+export RKE2_REGISTRY_AUTH_USER=${5}        #---- qgenqzva
+export RKE2_REGISTRY_AUTH_PASS=${6}        #---- yYzkS6YzeTSpw6T
 
 
 IFILE=/Users/admin/.ssh/${RKE2_REGISTRY_HOST_NAME}
@@ -258,7 +258,7 @@ docker_repo_start
 		#docker_rsync_repo_locn app-sdc
 }
 
-#  . `pwd`/docker_private_registry_base_build.sh rke2private vm-rg-rke2private-1-1 20.69.126.36 10.0.0.4
+#  . `pwd`/docker_private_registry_base_build.sh rke2private vm-rg-rke2private-1-1 20.69.126.36 10.0.0.4 dtradmin lLmxF6LmrGFcj6G
 
 #/*********************************************************************************************************/
 
@@ -275,7 +275,6 @@ function docker_test_repo(){
             sudo docker tag alpine ${DOCKER_HOST}/my-alpine
             sudo docker push ${DOCKER_HOST}/my-alpine
 }
-
 
 
 # dps
